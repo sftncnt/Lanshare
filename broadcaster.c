@@ -10,6 +10,7 @@
 #include <netdb.h>
 
 #define SERVERPORT 3490	// the port users will be connecting to
+#define HOST_NAME_MAX 256
 
 struct sockaddr_in init_broadcast_socket() {
     struct sockaddr_in their_addr;
@@ -49,59 +50,71 @@ int init_broadcaster_socket() {
     return sockfd;
 }
 
+FILE *get_file(char *filepath) {
+    printf("%s\n", filepath);
+    FILE *fp = fopen(filepath, "r");
+    if (fp == NULL) {
+        perror("open");
+        exit(1);
+    }
+    return fp;
+}
+
+char *get_file_name(char *filepath) {
+    char *name = strrchr(filepath, '/');
+    if (name != NULL) {
+        name++;
+    } else {
+        return filepath;
+    }
+    printf("Name: %s\n", name);
+    return name;
+
+}
+
+char *construct_message(char *filepath) {
+    char hostname[HOST_NAME_MAX];
+    if (gethostname(hostname, sizeof(hostname)) == -1) {
+        perror("gethostname");
+        exit(1);
+    }
+    char *filename = get_file_name(filepath);
+    char *message = " would like to share ";
+    char *combined_message = malloc(strlen(hostname) + strlen(message) + strlen(filename) + 1);
+    strcpy(combined_message, hostname);
+    strcat(combined_message, message);
+    strcat(combined_message, filename);
+    printf("Combined message: %s\n", combined_message);
+    return combined_message;
+
+}
+
 int main(int argc, char *argv[]) {
     int sockfd;
-    struct hostent *he;
     struct sockaddr_in their_addr;
-    struct sockaddr_in their_addr2;
     int numbytes;
-    int broadcast = 1;
     char buf[1024];
-    char name[1024];
-    gethostname(name, strlen(name));
-    char *message = " would like to share a file";
-    char *combined_message = malloc(strlen(name) + strlen(message) + 1);
-    strcpy(combined_message, name);
-    strcat(combined_message, message);
 
 
-    /*if (argc != 3) {
-        fprintf(stderr, "usage: broadcaster hostname message");
-    }
-
-    if ((he = gethostbyname(argv[1])) == NULL) {
-        perror("gethostbyname\n");
-        exit(1);
-    } else {
-        printf("got host\n");
-    }
-
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-        perror("socket");
+    if (argc != 2) {
+        fprintf(stderr, "usage: filepath\n");
         exit(1);
     }
 
-    if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof broadcast) == -1) {
-        perror("sets");
-    }*/
+    FILE *file_to_share = get_file(argv[1]);
+    char temp[1024];
+    fgets(temp, sizeof temp, file_to_share);
+    printf("File contents: %s\n", temp);
+    get_file_name(argv[1]);
 
-    /*struct sockaddr_in my_addr;
-    my_addr.sin_family = AF_INET;
-    my_addr.sin_port = htons(3490);
-    my_addr.sin_addr.s_addr = INADDR_ANY;
-    memset(my_addr.sin_zero, 0, sizeof my_addr.sin_zero);
-
-    bind(sockfd, (struct sockaddr *)&my_addr, sizeof(my_addr));
-
-    their_addr.sin_family = AF_INET;
-    their_addr.sin_port = htons(SERVERPORT);
-    their_addr.sin_addr = *((struct in_addr *)he->h_addr);
-    memset(their_addr.sin_zero, '\0', sizeof their_addr.sin_zero);*/
+    
 
     sockfd = init_broadcaster_socket();
     their_addr = init_broadcast_socket();
 
-    numbytes = sendto(sockfd, combined_message, strlen(combined_message), 0, (struct sockaddr *)&their_addr, sizeof their_addr);
+    char *first_message = construct_message(argv[1]);
+
+    numbytes = sendto(sockfd, first_message, strlen(first_message), 0, (struct sockaddr *)&their_addr, sizeof their_addr);
 
     if (numbytes == -1) {
         perror("sendto");
