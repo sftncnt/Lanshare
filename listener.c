@@ -48,13 +48,13 @@ char *construct_response_packet(char response) {
     return packet;
 }
 
-int init_listener() {
+int init_listener(int socktype) {
     struct addrinfo hints, *servinfo, *p;
     int sockfd, numbytes, rv;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_socktype = socktype;
     hints.ai_flags = AI_PASSIVE; // use my IP
 
     if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
@@ -84,6 +84,41 @@ int init_listener() {
     return sockfd;
 }
 
+
+int handle_connection(struct sockaddr_storage *their_addr, char *buf, int sockfd) {
+    char s[INET6_ADDRSTRLEN];
+    int numbytes;
+    inet_ntop(their_addr->ss_family, get_in_addr((struct sockaddr *)their_addr), s, 
+            sizeof s);
+    printf("Received connection: %s\n", buf);
+    int gettingInput = 1;
+    while (gettingInput) {
+        printf("Would you like to receive this file? (y/n): ");
+        char response = getchar();
+        printf("Your response is %c\n", response);
+        if (response == 'y' || response == 'n') {
+            char *response_to_send = construct_response_packet(response);
+            printf("Packet: %s\n", response_to_send);
+            numbytes = sendto(sockfd, response_to_send, sizeof response_to_send, 0, (struct sockaddr *)their_addr, 
+                sizeof *their_addr);
+            if (numbytes == -1) {
+                perror("sendto");
+                exit(1);
+            }
+            free(response_to_send);
+            close(sockfd);
+            if (response == 'y') {
+                return 1;
+            } else {
+                return 0;
+            }
+        } else {
+            printf("Please enter either y or n\n");
+        }
+    }
+
+}
+
 int main() {
     int sockfd, numbytes;
     struct sockaddr_storage their_addr; // connector's address info
@@ -93,7 +128,7 @@ int main() {
     char buf[MAXBUFLEN];
     
 
-    sockfd = init_listener();
+    sockfd = init_listener(SOCK_DGRAM);
     
     
     printf("listener: waiting to recvfrom...\n");
@@ -106,33 +141,13 @@ int main() {
         exit(1);
     }
 
-    inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, 
-            sizeof s);
-    printf("listener got packet from: %s\n", s);
-    printf("listener: packet is %d bytes long\n", numbytes);
-    printf("listener: packet contains \"%s\"\n", buf);
-    int gettingInput = 1;
-    while (gettingInput) {
-        printf("Would you like to receive this file? (y/n): ");
-        char response = getchar();
-        printf("Your response is %c\n", response);
-        if (response == 'y' || response == 'n') {
-            char *response_to_send = construct_response_packet(response);
-            printf("Packet: %s\n", response_to_send);
-            numbytes = sendto(sockfd, response_to_send, sizeof response_to_send, 0, (struct sockaddr *)&their_addr, 
-                sizeof their_addr);
-            if (numbytes == -1) {
-                perror("sendto");
-                exit(1);
-            }
-            free(response_to_send);
-            gettingInput = 0;
-        } else {
-            printf("Please enter either y or n\n");
-        }
+    if (handle_connection(&their_addr, buf, sockfd) == 1) {
+        printf("Accepted connetion\n");
+    } else {
+        printf("Rejected connection\n");
     }
-    printf("Sent %d bytes\n", numbytes);
-    close(sockfd);
+
+    
     return 0;
     
         
