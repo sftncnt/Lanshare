@@ -12,7 +12,7 @@
 #include <signal.h>
 
 #define PORT "3490"
-#define BACKLOG 10
+#define BACKLOG 1
 #define MAXBUFLEN 100
 #define HOST_NAME_LEN 255
 
@@ -48,12 +48,12 @@ char *construct_response_packet(char response) {
     return packet;
 }
 
-int init_listener(int socktype) {
+int init_sokcet(int socktype) {
     struct addrinfo hints, *servinfo, *p;
     int sockfd, numbytes, rv;
 
     memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
+    hints.ai_family = AF_INET;
     hints.ai_socktype = socktype;
     hints.ai_flags = AI_PASSIVE; // use my IP
 
@@ -85,7 +85,7 @@ int init_listener(int socktype) {
 }
 
 
-int handle_connection(struct sockaddr_storage *their_addr, char *buf, int sockfd) {
+int handle_discovery(struct sockaddr_storage *their_addr, char *buf, int sockfd) {
     char s[INET6_ADDRSTRLEN];
     int numbytes;
     inet_ntop(their_addr->ss_family, get_in_addr((struct sockaddr *)their_addr), s, 
@@ -119,6 +119,18 @@ int handle_connection(struct sockaddr_storage *their_addr, char *buf, int sockfd
 
 }
 
+int handle_connection(struct sockaddr_storage *their_addr, int sockfd) {
+    socklen_t sin_size = sizeof *their_addr;
+    
+    int new_sockfd = accept(sockfd, (struct sockaddr *)their_addr, &sin_size);
+    if (new_sockfd == -1) {
+        perror("tcp connection");
+        exit(1);
+    }
+    return new_sockfd;
+
+}
+
 int main() {
     int sockfd, numbytes;
     struct sockaddr_storage their_addr; // connector's address info
@@ -128,7 +140,7 @@ int main() {
     char buf[MAXBUFLEN];
     
 
-    sockfd = init_listener(SOCK_DGRAM);
+    sockfd = init_sokcet(SOCK_DGRAM);
     
     
     printf("listener: waiting to recvfrom...\n");
@@ -141,11 +153,24 @@ int main() {
         exit(1);
     }
 
-    if (handle_connection(&their_addr, buf, sockfd) == 1) {
-        printf("Accepted connetion\n");
-    } else {
-        printf("Rejected connection\n");
+    if (handle_discovery(&their_addr, buf, sockfd) == 0) {
+        printf("Rejected connetion\n");
+        return 0;
+    } 
+
+    close(sockfd);
+
+    sockfd = init_sokcet(SOCK_STREAM);
+
+    if (listen(sockfd, BACKLOG) == -1) {
+        perror("listen");
+        exit(1);
     }
+
+    int new_sockfd = handle_connection(&their_addr, sockfd);
+    numbytes = recv(new_sockfd, buf, sizeof buf, 0);
+    
+
 
     
     return 0;

@@ -12,6 +12,14 @@
 #define SERVERPORT 3490	// the port users will be connecting to
 #define HOST_NAME_MAX 256
 
+struct file_packet {
+    uint16_t packet_size;
+    uint16_t filename_size;
+    char filename[256];
+    uint16_t file_size;
+    char file_data[8192];
+};
+
 struct sockaddr_in init_broadcast_socket() {
     struct sockaddr_in their_addr;
     struct hostent *he;
@@ -84,10 +92,47 @@ char *construct_message(char *filepath) {
     strcpy(combined_message, hostname);
     strcat(combined_message, message);
     strcat(combined_message, filename);
-    printf("Combined message: %s\n", combined_message);
+    printf("Combined message size: %s\n", combined_message);
     return combined_message;
 
 }
+
+int handle_response(char *buf) {
+    uint16_t net_len;
+    uint16_t hostname_len;
+    char response;
+
+    memcpy(&response, &buf[2], 1);
+    if (response == 'n') {
+        printf("Connection rejected\n");
+        exit(1);
+    } 
+    
+    memcpy(&net_len, buf, 2);
+    hostname_len = ntohs(net_len);
+    char their_hostname[hostname_len + 1];
+    memcpy(their_hostname, &buf[3], hostname_len);
+    their_hostname[hostname_len] = '\0';
+    printf("%s accepted your request\n", their_hostname);
+    return 1;
+    
+}
+
+int init_tcp_connection(struct sockaddr_in *their_addr) {
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        perror("tcp socket");
+        exit(1);
+    }
+    if (connect(sockfd, (struct sockaddr *)their_addr, sizeof *their_addr) == -1) {
+        perror("tcp connection");
+        exit(1);
+    }
+    return sockfd;
+
+}
+
+
 
 int main(int argc, char *argv[]) {
     int sockfd;
@@ -102,12 +147,6 @@ int main(int argc, char *argv[]) {
     }
 
     FILE *file_to_share = get_file(argv[1]);
-    char temp[1024];
-    fgets(temp, sizeof temp, file_to_share);
-    printf("File contents: %s\n", temp);
-    get_file_name(argv[1]);
-
-    
 
     sockfd = init_broadcaster_socket();
     their_addr = init_broadcast_socket();
@@ -128,15 +167,15 @@ int main(int argc, char *argv[]) {
     printf("Address length is %d\n", addr_len);
     //memset(&their_addr.sin_addr, 0, sizeof their_addr.sin_addr);
     numbytes = recvfrom(sockfd, buf, sizeof buf, 0, (struct sockaddr *)&their_addr, &addr_len);
-    printf("Received %d bytes from %s\n", numbytes, inet_ntoa(their_addr.sin_addr));
-    uint16_t net_len;
-    memcpy(&net_len, buf, 2);
-    uint16_t hostname_len = ntohs(net_len);
-    printf("Message: %d\n", hostname_len);
+
+    close(sockfd);
+
+    handle_response(buf);
+    sockfd = init_tcp_connection(&their_addr);
+    
     
     
 
-    close(sockfd);
 
     return 0;
 
