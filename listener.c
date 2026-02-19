@@ -66,6 +66,9 @@ int init_sokcet(int socktype) {
             perror("server: socket\n");
             continue;
         }
+
+        int yes = 1;
+        setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
         
         if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             close(sockfd);
@@ -96,6 +99,8 @@ int handle_discovery(struct sockaddr_storage *their_addr, char *buf, int sockfd)
         printf("Would you like to receive this file? (y/n): ");
         char response = getchar();
         printf("Your response is %c\n", response);
+        int c;
+        while ((c = getchar()) != '\n' && c != EOF);
         if (response == 'y' || response == 'n') {
             char *response_to_send = construct_response_packet(response);
             printf("Packet: %s\n", response_to_send);
@@ -129,6 +134,32 @@ int handle_connection(struct sockaddr_storage *their_addr, int sockfd) {
     }
     return new_sockfd;
 
+}
+
+
+
+int recv_all(int sockfd, void *buf, size_t len) {
+    int total = 0;
+    int n;
+    while (total < len)
+    {
+        n = recv(sockfd, buf, len, 0);
+        if (n == -1) {
+            perror("recv");
+            exit(1);
+        }
+        total += n;
+    }
+    return total;
+}
+
+void save_file(char *filename, char* filepath, char * filedata, int file_size) {
+    strcat(filepath, "/");
+    strcat(filepath, filename);
+    printf("Updated filepath: %s\n", filepath);
+    FILE *fp = fopen(filepath, "wb");
+    int bytes_left;
+    fwrite(filedata, 1, file_size, fp);
 }
 
 int main() {
@@ -168,8 +199,35 @@ int main() {
     }
 
     int new_sockfd = handle_connection(&their_addr, sockfd);
-    numbytes = recv(new_sockfd, buf, sizeof buf, 0);
+    uint32_t net_filename_size;
+    uint32_t net_file_size;
+
+    recv_all(new_sockfd, &net_filename_size, 4);
+    recv_all(new_sockfd, &net_file_size, 4);
+
+    uint32_t host_filename_size = ntohl(net_filename_size);
+    uint32_t host_file_size = ntohl(net_file_size);
+
+    printf("Filename size: %u, File size: %u\n",
+        host_filename_size, host_file_size);
+    printf("Raw net filename: %u\n", net_filename_size);
+    printf("Raw net filesize: %u\n", net_file_size);
+
+    char *filename = malloc(host_filename_size + 1);
+
+    recv_all(new_sockfd, filename, host_filename_size);
+    filename[host_filename_size] = '\0';
+
+    printf("Filename: %s\n", filename);
+    char chunk[host_file_size];
+    recv_all(new_sockfd, chunk, host_file_size);
     
+    char filepath[256];
+    printf("Enter path to save file to: ");
+    fgets(filepath, 255, stdin);
+    filepath[strcspn(filepath, "\n")] = '\0';
+    save_file(filename, filepath, chunk, host_file_size);
+
 
 
     

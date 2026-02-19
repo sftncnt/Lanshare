@@ -8,16 +8,17 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/stat.h>
 
 #define SERVERPORT 3490	// the port users will be connecting to
 #define HOST_NAME_MAX 256
+#define FILE_SIZE_MAX 4000000000
+#define CHUNK_SIZE 8192
 
-struct file_packet {
-    uint16_t packet_size;
-    uint16_t filename_size;
-    char filename[256];
-    uint16_t file_size;
-    char file_data[8192];
+struct header_format {
+    uint32_t filename_size;
+    uint32_t file_size;
+    char *filename;
 };
 
 struct sockaddr_in init_broadcast_socket() {
@@ -86,6 +87,7 @@ char *construct_message(char *filepath) {
         perror("gethostname");
         exit(1);
     }
+    hostname[sizeof(hostname) - 1] = '\0';
     char *filename = get_file_name(filepath);
     char *message = " would like to share ";
     char *combined_message = malloc(strlen(hostname) + strlen(message) + strlen(filename) + 1);
@@ -132,7 +134,55 @@ int init_tcp_connection(struct sockaddr_in *their_addr) {
 
 }
 
+off_t get_file_size(char *path) {
+    struct stat st;
+    if (stat(path, &st) == -1) {
+        perror("stat");
+        exit(1);
+    }
+    if (st.st_size > FILE_SIZE_MAX) {
+        printf("File size too large");
+        exit(1);
+    }
+    return st.st_size;
+}
 
+char *construct_header(char *filepath, uint32_t *header_size) {
+    char *filename = get_file_name(filepath);
+    size_t filename_size = strlen(filename);
+    uint32_t net_filename_size = htonl((uint32_t)(filename_size));
+
+    off_t file_size = get_file_size(filepath);
+    printf("File size: %ld\n", file_size);
+    uint32_t net_file_size = htonl((uint32_t)(file_size));
+
+    *header_size = ((sizeof(uint32_t) * 2) + filename_size);
+    printf("Header size: %ls\n", header_size);
+    char *header = malloc(*header_size);
+
+    memcpy(header, &net_filename_size, 4);
+    memcpy(header + 4, &net_file_size, 4);
+    memcpy(header + 8, filename, filename_size);
+
+    return header;
+}
+
+int sendall(char *buf, int *len, int sockfd) {
+    int total = 0;
+    int bytes_left = *len;
+    int n;
+    while(total < *len) {
+        n = send(sockfd, buf, bytes_left, 0);
+        if (n == -1) {
+            perror("send");
+            exit(1);
+        }
+        total += n;
+        bytes_left -= n;
+    } 
+    *len = total;
+    return n == -1? -1: 0;
+}
 
 int main(int argc, char *argv[]) {
     int sockfd;
@@ -153,7 +203,7 @@ int main(int argc, char *argv[]) {
 
     char *first_message = construct_message(argv[1]);
 
-    numbytes = sendto(sockfd, first_message, strlen(first_message), 0, (struct sockaddr *)&their_addr, sizeof their_addr);
+    numbytes = sendto(sockfd, first_message, strlen(first_message) + 1, 0, (struct sockaddr *)&their_addr, sizeof their_addr);
 
     if (numbytes == -1) {
         perror("sendto");
@@ -168,13 +218,28 @@ int main(int argc, char *argv[]) {
     //memset(&their_addr.sin_addr, 0, sizeof their_addr.sin_addr);
     numbytes = recvfrom(sockfd, buf, sizeof buf, 0, (struct sockaddr *)&their_addr, &addr_len);
 
+    if (numbytes == -1) {
+        perror("recvfrom");
+        exit(1);
+    }
+
     close(sockfd);
 
     handle_response(buf);
     sockfd = init_tcp_connection(&their_addr);
-    
-    
-    
+
+    uint32_t header_size;
+    char *header = construct_header(argv[1], &header_size);
+    printf("header_size: %d\n", header_size);
+    int send_status = sendall(header, &header_size, sockfd);
+
+    char chunk[8192];
+    int chunk_size = 8192;
+    int bytes_read;
+    while ((bytes_read = fread(chunk, 1, chunk_size, file_to_share)) > 0) {
+        //printf("chunks: %s\n", chunk);
+        sendall(chunk, &bytes_read, sockfd);
+    }
 
 
     return 0;
