@@ -12,7 +12,7 @@
 
 int init_broadcast_socket(struct sockaddr_in *their_addr) {
     struct hostent *he;
-    char *broadcast_address = "172.24.63.255";
+    char *broadcast_address = "255.255.255.255";
     if ((he = gethostbyname(broadcast_address)) == NULL) {
         perror("gethostbyname\n");
         return -1;
