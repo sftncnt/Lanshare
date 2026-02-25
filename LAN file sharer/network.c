@@ -12,7 +12,7 @@
 
 int init_broadcast_socket(struct sockaddr_in *their_addr) {
     struct hostent *he;
-    char *broadcast_address = "255.255.255.255";
+    char *broadcast_address = "172.24.63.255";
     if ((he = gethostbyname(broadcast_address)) == NULL) {
         perror("gethostbyname\n");
         return -1;
@@ -63,9 +63,9 @@ int init_tcp_connection(struct sockaddr_in *their_addr) {
 }
 
 int sendall(char *buf, size_t len, int sockfd) {
-    int total = 0;
-    int bytes_left = len;
-    int n;
+    size_t total = 0;
+    size_t bytes_left = len;
+    ssize_t n;
     while(total < len) {
         n = send(sockfd, buf, bytes_left, 0);
         if (n == -1) {
@@ -144,8 +144,8 @@ int handle_connection(struct sockaddr_storage *their_addr, int sockfd) {
 }
 
 int recv_all(int sockfd, void *buf, size_t len) {
-    int total = 0;
-    int n;
+    size_t total = 0;
+    ssize_t n;
     printf("Length passed: %ld\n", len);
     while (total < len)
     {
