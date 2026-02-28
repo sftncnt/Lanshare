@@ -41,7 +41,7 @@ int init_broadcaster_socket() {
     }
     my_addr.sin_addr.s_addr = INADDR_ANY;
     my_addr.sin_family = AF_INET;
-    my_addr.sin_port = htons(SERVERPORT);
+    
     memset(my_addr.sin_zero, 0, sizeof my_addr.sin_zero);
     bind(sockfd, (struct sockaddr *)&my_addr, sizeof my_addr);
 

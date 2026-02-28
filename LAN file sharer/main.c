@@ -31,7 +31,7 @@ int send_mode(char *filepath) {
 
     file_size = get_file_size(filepath);
     if (file_size == -1) {
-        cleanup_and_exit(file_to_share, sockfd);
+        cleanup_and_exit(file_to_share, 0);
     }
 
     sockfd = init_broadcaster_socket();
@@ -59,7 +59,7 @@ int send_mode(char *filepath) {
     printf("sent %d bytes to %s\n", numbytes,
      inet_ntoa(their_addr.sin_addr));
     
-    socklen_t addr_len = sizeof(struct sockaddr_storage);
+    socklen_t addr_len = sizeof(struct sockaddr_in);
     printf("Address length is %d\n", addr_len);
     printf("Waiting for response...");
     fflush(stdout);
@@ -77,7 +77,7 @@ int send_mode(char *filepath) {
     if (rv == -1) {
         cleanup_and_exit(file_to_share, sockfd);
     }
-
+    
     sockfd = init_tcp_connection(&their_addr);
     if (sockfd == -1) {
         cleanup_and_exit(file_to_share, sockfd);
@@ -135,28 +135,43 @@ int receive_mode() {
         return 1;
     }
 
-    if (handle_discovery(&their_addr, buf, sockfd) == 0) {
+    char *response_to_send = NULL;
+    size_t packet_size;
+    if (handle_discovery(&response_to_send, &packet_size) == 0) {
         printf("Rejected connetion\n");
         return 0;
     } 
 
-    close(sockfd);
-
-    sockfd = init_socket(SOCK_STREAM);
-    if (sockfd == -1) {
+    int tcp_sockfd = init_socket(SOCK_STREAM);
+    if (tcp_sockfd == -1) {
         cleanup_and_exit(NULL, sockfd);
     }
 
-    if (listen(sockfd, BACKLOG) == -1) {
+    if (listen(tcp_sockfd, BACKLOG) == -1) {
         perror("listen");
-        cleanup_and_exit(NULL, sockfd);
+        cleanup_and_exit(NULL, tcp_sockfd);
     }
 
-    int new_sockfd = handle_connection(&their_addr, sockfd);
-    if (new_sockfd == -1) {
-        cleanup_and_exit(NULL, sockfd);
+    numbytes = sendto(sockfd, response_to_send, packet_size, 0, (struct sockaddr *)&their_addr, 
+                (socklen_t) (sizeof their_addr));
+    if (numbytes == -1) {
+        perror("sendto");
+        exit(1);
     }
+
+    free(response_to_send);
     close(sockfd);
+
+    
+
+    
+
+    int new_sockfd = handle_connection(&their_addr, tcp_sockfd);
+    if (new_sockfd == -1) {
+        cleanup_and_exit(NULL, new_sockfd);
+    }
+    
+    close(tcp_sockfd);
 
     uint32_t net_filename_size;
     uint32_t net_file_size;

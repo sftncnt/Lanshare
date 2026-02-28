@@ -75,7 +75,7 @@ char *construct_header(char *filepath, uint32_t *header_size) {
 
 // receiver functions
 
-char *construct_response_packet(char response) {
+char *construct_response_packet(char response, size_t *packet_size) {
     char hostname[HOST_NAME_MAX];
     if ((gethostname(hostname, sizeof hostname)) == -1) {
         perror("gethostname");
@@ -83,9 +83,9 @@ char *construct_response_packet(char response) {
     }
     size_t hostname_len = strnlen(hostname, sizeof hostname);
     uint16_t net_len = htons((uint16_t)(hostname_len));
-    size_t packet_size = hostname_len + 2 + 1;
+    *packet_size = hostname_len + 2 + 1;
 
-    char *packet = malloc(packet_size);
+    char *packet = malloc(*packet_size);
     if (!packet) {
         return NULL;
     }
@@ -98,12 +98,7 @@ char *construct_response_packet(char response) {
     return packet;
 }
 
-int handle_discovery(struct sockaddr_storage *their_addr, char *buf, int sockfd) {
-    char s[INET6_ADDRSTRLEN];
-    int numbytes;
-    inet_ntop(their_addr->ss_family, get_in_addr((struct sockaddr *)their_addr), s, 
-            sizeof s);
-    printf("Received connection: %s\n", buf);
+int handle_discovery(char **response_to_send, size_t *packet_size) {
     int gettingInput = 1;
     while (gettingInput) {
         printf("Would you like to receive this file? (y/n): ");
@@ -112,16 +107,9 @@ int handle_discovery(struct sockaddr_storage *their_addr, char *buf, int sockfd)
         int c;
         while ((c = getchar()) != '\n' && c != EOF);
         if (response == 'y' || response == 'n') {
-            char *response_to_send = construct_response_packet(response);
-            printf("Packet: %s\n", response_to_send);
-            numbytes = sendto(sockfd, response_to_send, sizeof response_to_send, 0, (struct sockaddr *)their_addr, 
-                sizeof *their_addr);
-            if (numbytes == -1) {
-                perror("sendto");
-                exit(1);
-            }
-            free(response_to_send);
-            close(sockfd);
+            *response_to_send = construct_response_packet(response, packet_size);
+            printf("Packet: \n");
+            
             if (response == 'y') {
                 return 1;
             } else {
@@ -131,5 +119,7 @@ int handle_discovery(struct sockaddr_storage *their_addr, char *buf, int sockfd)
             printf("Please enter either y or n\n");
         }
     }
+
+    return 0;
 
 }

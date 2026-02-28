@@ -14,9 +14,9 @@ int handle_response(char *buf);
 
 char *construct_header(char *filepath, uint32_t *header_size);
 
-char *construct_response_packet(char response);
+char *construct_response_packet(char response, size_t *packet_size);
 
-int handle_discovery(struct sockaddr_storage *their_addr, char *buf, int sockfd);
+int handle_discovery(char **response_to_send, size_t *packet_size);
 
 
 #endif
