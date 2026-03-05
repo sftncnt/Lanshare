@@ -19,19 +19,16 @@ char *construct_message(char *filepath, size_t *message_len) {
     }
     hostname[sizeof(hostname) - 1] = '\0';
     char *filename = get_file_name(filepath);
-    printf("FILENAME: %s\n", filename);
-    printf("%ld\n", strlen(filename));
-    //char *message = " would like to share ";
     uint16_t hostname_len = strlen(hostname);
     uint16_t net_hostname_len = htons(hostname_len);
     char *combined_message = malloc(strlen(hostname) + strlen(filename) + 3);
     if (!combined_message) {
-        exit(1);
+        return NULL;
     }
+
     memcpy(combined_message, &net_hostname_len, 2);
     memcpy(combined_message + 2, hostname, hostname_len);
     memcpy(combined_message + 2 + hostname_len, filename, strlen(filename) + 1);
-    printf("Constructed message %ld\n", sizeof(combined_message));
 
     *message_len = hostname_len + 2 + strlen(filename) + 1;
     
@@ -45,7 +42,7 @@ int handle_response(char *buf) {
     char response;
 
     memcpy(&response, &buf[2], 1);
-    printf("%c\n", response);
+    
     if (response == 'n') {
         printf("\nConnection rejected\n");
         return -1;
@@ -67,11 +64,9 @@ char *construct_header(char *filepath, uint32_t *header_size) {
     uint32_t net_filename_size = htonl((uint32_t)(filename_size));
 
     off_t file_size = get_file_size(filepath);
-    printf("File size: %ld\n", file_size);
     uint32_t net_file_size = htonl((uint32_t)(file_size));
 
     *header_size = ((sizeof(uint32_t) * 2) + filename_size);
-    printf("Header size: %ls\n", header_size);
     char *header = malloc(*header_size);
     if (!header) {
         return NULL;
@@ -113,17 +108,15 @@ int handle_discovery(char **response_to_send, size_t *packet_size, char *buf, FI
     uint16_t net_hostname_len;
     memcpy(&net_hostname_len, buf, 2);
     uint16_t host_hostname_len = ntohs(net_hostname_len);
-    printf("Hostname length is %d", host_hostname_len);
     char hostname[host_hostname_len + 1];
     memcpy(hostname, buf + 2, host_hostname_len);
     hostname[host_hostname_len] = '\0';
-    printf("Hostname: %s\n", hostname);
+
     uint16_t filename_size = strlen(buf + 5);
-    printf("Filename lenght is %d\n", filename_size);
     char filename[filename_size + 1];
     memcpy(filename, buf + 2 + host_hostname_len, filename_size + 1);
     filename[filename_size] = '\0';
-    printf("Filename: %s\n", filename);
+    
     printf("%s would like to share %s\n", hostname, filename);
     int gettingInput = 1;
     while (gettingInput) {
@@ -143,18 +136,6 @@ int handle_discovery(char **response_to_send, size_t *packet_size, char *buf, FI
             printf("Please enter either y or n\n");
         }
         
-        /*if (response == 'y' || response == 'n') {
-            *response_to_send = construct_response_packet(response, packet_size);
-            printf("Packet: \n");
-            
-            if (response == 'y') {
-                return 1;
-            } else {
-                return 0;
-            }
-        } else {
-            printf("Please enter either y or n\n");
-        }*/
     }
 
     return 0;

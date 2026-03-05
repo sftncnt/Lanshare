@@ -30,7 +30,7 @@ FILE *get_file(char *filepath) {
         return NULL;
     }
     
-    printf("%s\n", filepath);
+    
     FILE *fp = fopen(filepath, "r");
     if (fp == NULL) {
         perror("open");
@@ -46,7 +46,6 @@ char *get_file_name(char *filepath) {
     } else {
         return filepath;
     }
-    printf("Name: %s\n", name);
     return name;
 
 }
@@ -73,7 +72,6 @@ FILE *open_file(char *filename) {
         filepath[strcspn(filepath, "\n")] = '\0';
         strcat(filepath, "/");
         strcat(filepath, filename);
-        printf("Updated filepath: %s\n", filepath);
         fp = fopen(filepath, "wb");
     }
     return fp;

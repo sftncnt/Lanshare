@@ -16,9 +16,7 @@ int init_broadcast_socket(struct sockaddr_in *their_addr) {
     if ((he = gethostbyname(broadcast_address)) == NULL) {
         perror("gethostbyname\n");
         return -1;
-    } else {
-        printf("got host\n");
-    }
+    } 
     their_addr->sin_family = AF_INET;
     their_addr->sin_port = htons(SERVERPORT);
     their_addr->sin_addr = *((struct in_addr *)he->h_addr_list[0]);
@@ -146,7 +144,6 @@ int handle_connection(struct sockaddr_storage *their_addr, int sockfd) {
 int recv_all(int sockfd, void *buf, size_t len) {
     size_t total = 0;
     ssize_t n;
-    printf("Length passed: %ld\n", len);
     while (total < len)
     {
         n = recv(sockfd, buf + total, len, 0);
@@ -164,7 +161,7 @@ void recv_and_save_file(size_t host_file_size, int new_sockfd, FILE *fp) {
         fprintf(stderr, "Invalid file pointer\n");
         return;
     }
-    printf("Running\n");
+    
     char buffer[8192];
     size_t total = 0;
 

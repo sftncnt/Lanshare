@@ -13,7 +13,7 @@
 
 void usage() {
     printf("usage: send <filepath>\n");
-    printf("usage: receive <directory>\n");
+    printf("usage: receive\n");
 }
 
 int send_mode(char *filepath) {
@@ -46,7 +46,6 @@ int send_mode(char *filepath) {
 
     size_t message_len;
     char *first_message = construct_message(filepath, &message_len);
-    printf("MESSAGE LENGHT %ld\n", message_len);
     if (!first_message) {
         cleanup_and_exit(file_to_share, sockfd);
     }
@@ -57,12 +56,8 @@ int send_mode(char *filepath) {
         perror("sendto");
         return 1;
     }
-
-    printf("sent %d bytes to %s\n", numbytes,
-     inet_ntoa(their_addr.sin_addr));
     
     socklen_t addr_len = sizeof(struct sockaddr_in);
-    printf("Address length is %d\n", addr_len);
     printf("Waiting for response...");
     fflush(stdout);
     
@@ -90,7 +85,7 @@ int send_mode(char *filepath) {
     if (!header) {
         cleanup_and_exit(file_to_share, sockfd);
     }
-    printf("header_size: %d\n", header_size);
+    
     rv = sendall(header, header_size, sockfd);
     if (rv == -1) {
         cleanup_and_exit(file_to_share, sockfd);
@@ -127,7 +122,7 @@ int receive_mode() {
         cleanup_and_exit(NULL, sockfd);
     }
     
-    printf("listener: waiting to recvfrom...\n");
+    printf("Waiting for connection...\n");
 
     sin_size = sizeof their_addr;
 
@@ -139,9 +134,8 @@ int receive_mode() {
 
     char *response_to_send = NULL;
     size_t packet_size;
-    uint16_t buffer_size = strlen(buf + 3);
     FILE *fp = NULL;
-    printf("BUFFER SIZE %d\n", buffer_size);
+    
 
    
     if (handle_discovery(&response_to_send, &packet_size, buf, &fp) == 0) {
@@ -196,10 +190,7 @@ int receive_mode() {
     uint32_t host_filename_size = ntohl(net_filename_size);
     uint32_t host_file_size = ntohl(net_file_size);
 
-    printf("Filename size: %u, File size: %u\n",
-        host_filename_size, host_file_size);
-    printf("Raw net filename: %u\n", net_filename_size);
-    printf("Raw net filesize: %u\n", net_file_size);
+    
 
     char *filename = malloc(host_filename_size + 1);
     if (!filename) {
@@ -212,7 +203,7 @@ int receive_mode() {
     }
     filename[host_filename_size] = '\0';
 
-    printf("Filename: %s\n", filename);
+    
     
     
     
