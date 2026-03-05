@@ -160,6 +160,11 @@ int recv_all(int sockfd, void *buf, size_t len) {
 }
 
 void recv_and_save_file(size_t host_file_size, int new_sockfd, FILE *fp) {
+    if (!fp) {
+        fprintf(stderr, "Invalid file pointer\n");
+        return;
+    }
+    printf("Running\n");
     char buffer[8192];
     size_t total = 0;
 

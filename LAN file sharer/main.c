@@ -44,12 +44,14 @@ int send_mode(char *filepath) {
         cleanup_and_exit(file_to_share, sockfd);
     }
 
-    char *first_message = construct_message(filepath);
+    size_t message_len;
+    char *first_message = construct_message(filepath, &message_len);
+    printf("MESSAGE LENGHT %ld\n", message_len);
     if (!first_message) {
         cleanup_and_exit(file_to_share, sockfd);
     }
 
-    numbytes = sendto(sockfd, first_message, strlen(first_message) + 1, 0, (struct sockaddr *)&their_addr, sizeof their_addr);
+    numbytes = sendto(sockfd, first_message, message_len, 0, (struct sockaddr *)&their_addr, sizeof their_addr);
 
     if (numbytes == -1) {
         perror("sendto");
@@ -137,19 +139,26 @@ int receive_mode() {
 
     char *response_to_send = NULL;
     size_t packet_size;
-    if (handle_discovery(&response_to_send, &packet_size) == 0) {
+    uint16_t buffer_size = strlen(buf + 3);
+    FILE *fp = NULL;
+    printf("BUFFER SIZE %d\n", buffer_size);
+
+   
+    if (handle_discovery(&response_to_send, &packet_size, buf, &fp) == 0) {
+         numbytes = sendto(sockfd, response_to_send, packet_size, 0, (struct sockaddr *)&their_addr, 
+                (socklen_t) (sizeof their_addr));
         printf("Rejected connetion\n");
-        return 0;
+        cleanup_and_exit(NULL, sockfd);
     } 
 
     int tcp_sockfd = init_socket(SOCK_STREAM);
     if (tcp_sockfd == -1) {
-        cleanup_and_exit(NULL, sockfd);
+        cleanup_and_exit(fp, sockfd);
     }
 
     if (listen(tcp_sockfd, BACKLOG) == -1) {
         perror("listen");
-        cleanup_and_exit(NULL, tcp_sockfd);
+        cleanup_and_exit(fp, tcp_sockfd);
     }
 
     numbytes = sendto(sockfd, response_to_send, packet_size, 0, (struct sockaddr *)&their_addr, 
@@ -168,7 +177,7 @@ int receive_mode() {
 
     int new_sockfd = handle_connection(&their_addr, tcp_sockfd);
     if (new_sockfd == -1) {
-        cleanup_and_exit(NULL, new_sockfd);
+        cleanup_and_exit(fp, tcp_sockfd);
     }
     
     close(tcp_sockfd);
@@ -177,11 +186,11 @@ int receive_mode() {
     uint32_t net_file_size;
 
     if(recv_all(new_sockfd, &net_filename_size, sizeof net_filename_size) == -1) {
-        cleanup_and_exit(NULL, new_sockfd);
+        cleanup_and_exit(fp, new_sockfd);
     }
 
     if(recv_all(new_sockfd, &net_file_size, sizeof net_file_size) == -1) {
-        cleanup_and_exit(NULL, new_sockfd);
+        cleanup_and_exit(fp, new_sockfd);
     }
 
     uint32_t host_filename_size = ntohl(net_filename_size);
@@ -195,18 +204,18 @@ int receive_mode() {
     char *filename = malloc(host_filename_size + 1);
     if (!filename) {
         perror("malloc");
-        cleanup_and_exit(NULL, new_sockfd);
+        cleanup_and_exit(fp, new_sockfd);
     }
 
     if (recv_all(new_sockfd, filename, host_filename_size) == -1) {
-        cleanup_and_exit(NULL, new_sockfd);
+        cleanup_and_exit(fp, new_sockfd);
     }
     filename[host_filename_size] = '\0';
 
     printf("Filename: %s\n", filename);
     
     
-    FILE *fp = open_file(filename);
+    
     free(filename);
     recv_and_save_file(host_file_size, new_sockfd, fp);
     fclose(fp);
