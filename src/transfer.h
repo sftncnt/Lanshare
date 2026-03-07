@@ -17,7 +17,7 @@ char *construct_header(char *filepath, uint32_t *header_size);
 
 char *construct_response_packet(char response, size_t *packet_size);
 
-int handle_discovery(char **response_to_send, size_t *packet_size, char *buf, FILE **fp);
+int handle_discovery(char **response_to_send, size_t *packet_size, char *buf, FILE **fp, char *filepath);
 
 
 #endif

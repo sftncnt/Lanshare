@@ -24,6 +24,6 @@ int handle_connection(struct sockaddr_storage *their_addr, int sockfd);
 
 int recv_all(int sockfd, void *buf, size_t len);
 
-void recv_and_save_file(size_t host_file_size, int new_sockfd, FILE *fp);
+void recv_and_save_file(size_t host_file_size, int new_sockfd, FILE *fp, char* local_hash);
 
 #endif

@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <openssl/evp.h>
 #include "network.h"
 #include "transfer.h"
 #include "utils.h"
@@ -91,10 +92,14 @@ int send_mode(char *filepath) {
         cleanup_and_exit(file_to_share, sockfd);
     }
 
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(ctx, EVP_sha256(), NULL);
+
     char chunk[BUFSIZ];
     int bytes_read;
     long total = 0;
     while ((bytes_read = fread(chunk, 1, BUFSIZ, file_to_share)) > 0) {
+        EVP_DigestUpdate(ctx, chunk, bytes_read);
         rv = sendall(chunk, bytes_read, sockfd);
         if (rv == -1) {
             cleanup_and_exit(file_to_share, sockfd);
@@ -104,6 +109,20 @@ int send_mode(char *filepath) {
         printf("\rSending progress: %.2f%%", progress);
         fflush(stdout);
     }
+
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len = EVP_MD_get_size(EVP_sha256());
+    EVP_DigestFinal_ex(ctx, hash, &hash_len);
+
+    print_sha256(hash);
+
+    rv = sendall(hash, hash_len, sockfd);
+    if (rv == -1){
+        cleanup_and_exit(file_to_share, sockfd);
+    }
+
+    EVP_MD_CTX_free(ctx);
+
     printf("\n");
     fclose(file_to_share);
     close(sockfd);
@@ -137,8 +156,8 @@ int receive_mode() {
     FILE *fp = NULL;
     
 
-   
-    if (handle_discovery(&response_to_send, &packet_size, buf, &fp) == 0) {
+    char filepath[256];
+    if (handle_discovery(&response_to_send, &packet_size, buf, &fp, filepath) == 0) {
          numbytes = sendto(sockfd, response_to_send, packet_size, 0, (struct sockaddr *)&their_addr, 
                 (socklen_t) (sizeof their_addr));
         printf("Rejected connetion\n");
@@ -204,11 +223,29 @@ int receive_mode() {
     filename[host_filename_size] = '\0';
 
     
-    
-    
-    
     free(filename);
-    recv_and_save_file(host_file_size, new_sockfd, fp);
+
+
+    int hash_len = EVP_MD_get_size(EVP_sha256());
+    char *received_hash[hash_len];
+    char local_hash[hash_len];
+    recv_and_save_file(host_file_size, new_sockfd, fp, local_hash);
+    if (!local_hash) {
+        cleanup_and_exit(fp, new_sockfd);
+    }
+
+    if (recv_all(new_sockfd, received_hash, hash_len) == -1) {
+        cleanup_and_exit(fp, new_sockfd);
+    }
+
+    if (CRYPTO_memcmp(received_hash, received_hash, hash_len) != 0) {
+        printf("Integrity check failed. Deleting file\n");
+        if (remove(filepath) != 0) {
+            perror("remove");
+            cleanup_and_exit(fp, new_sockfd);
+        }
+    }
+
     fclose(fp);
     close(new_sockfd);
 

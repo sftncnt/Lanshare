@@ -8,6 +8,7 @@
 #include <netdb.h>
 #include <string.h>
 #include <unistd.h>
+#include <openssl/evp.h>
 
 
 int init_broadcast_socket(struct sockaddr_in *their_addr) {
@@ -156,13 +157,16 @@ int recv_all(int sockfd, void *buf, size_t len) {
     return total;
 }
 
-void recv_and_save_file(size_t host_file_size, int new_sockfd, FILE *fp) {
+void recv_and_save_file(size_t host_file_size, int new_sockfd, FILE *fp, char *local_hash) {
     if (!fp) {
         fprintf(stderr, "Invalid file pointer\n");
         return;
     }
     
-    char buffer[8192];
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(ctx, EVP_sha256(), NULL);
+
+    char buffer[BUFSIZ];
     size_t total = 0;
 
     while (total < host_file_size) {
@@ -175,6 +179,7 @@ void recv_and_save_file(size_t host_file_size, int new_sockfd, FILE *fp) {
             perror("recv");
             break;
         }
+        EVP_DigestUpdate(ctx, buffer, n);
         
         fwrite(buffer, 1, n, fp);
         total += n;
@@ -182,5 +187,12 @@ void recv_and_save_file(size_t host_file_size, int new_sockfd, FILE *fp) {
         printf("\rDownload progress: %.2f%%", progress);
         fflush(stdout);
     }
+    
+    unsigned int hash_len = EVP_MD_get_size(EVP_sha256());
+
+    EVP_DigestFinal_ex(ctx, local_hash, &hash_len);
+    EVP_MD_CTX_free(ctx);
+    print_sha256(local_hash);
     printf("\n");
+    return;
 }

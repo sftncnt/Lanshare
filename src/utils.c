@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <openssl/sha.h>
 
 void cleanup_and_exit(FILE *fp, int sockfd) {
     if (fp) {
@@ -15,6 +15,14 @@ void cleanup_and_exit(FILE *fp, int sockfd) {
         close(sockfd);
     }
     exit(1);
+}
+
+void print_sha256(unsigned char hash[SHA256_DIGEST_LENGTH]) {
+    printf("\n");
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        printf("%02x", hash[i]);
+    }
+    printf("\n");
 }
 
 FILE *get_file(char *filepath) {
@@ -63,7 +71,7 @@ off_t get_file_size(char *path) {
     return st.st_size;
 }
 
-FILE *open_file(char *filename) {
+FILE *open_file(char *filename, char* return_filepath) {
     char filepath[256];
     FILE *fp = NULL;
     while (fp == NULL) {
@@ -74,6 +82,7 @@ FILE *open_file(char *filename) {
         strcat(filepath, filename);
         fp = fopen(filepath, "wb");
     }
+    return_filepath = filepath;
     return fp;
 }
 

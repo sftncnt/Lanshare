@@ -104,7 +104,7 @@ char *construct_response_packet(char response, size_t *packet_size) {
     return packet;
 }
 
-int handle_discovery(char **response_to_send, size_t *packet_size, char *buf, FILE **fp) {
+int handle_discovery(char **response_to_send, size_t *packet_size, char *buf, FILE **fp, char *filepath) {
     uint16_t net_hostname_len;
     memcpy(&net_hostname_len, buf, 2);
     uint16_t host_hostname_len = ntohs(net_hostname_len);
@@ -122,12 +122,11 @@ int handle_discovery(char **response_to_send, size_t *packet_size, char *buf, FI
     while (gettingInput) {
         printf("Would you like to receive this file? (y/n): ");
         char response = getchar();
-        printf("Your response is %c\n", response);
         int c;
         while ((c = getchar()) != '\n' && c != EOF);
         if (response == 'y') {
             *response_to_send = construct_response_packet(response, packet_size);
-            *fp = open_file(filename);
+            *fp = open_file(filename, filepath);
             return 1;
         } else if (response == 'n') {
             *response_to_send = construct_response_packet(response, packet_size);
