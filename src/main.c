@@ -114,8 +114,6 @@ int send_mode(char *filepath) {
     unsigned int hash_len = EVP_MD_get_size(EVP_sha256());
     EVP_DigestFinal_ex(ctx, hash, &hash_len);
 
-    print_sha256(hash);
-
     rv = sendall(hash, hash_len, sockfd);
     if (rv == -1){
         cleanup_and_exit(file_to_share, sockfd);
