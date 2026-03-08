@@ -17,14 +17,6 @@ void cleanup_and_exit(FILE *fp, int sockfd) {
     exit(1);
 }
 
-void print_sha256(unsigned char hash[SHA256_DIGEST_LENGTH]) {
-    printf("\n");
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        printf("%02x", hash[i]);
-    }
-    printf("\n");
-}
-
 FILE *get_file(char *filepath) {
     struct stat st;
 
