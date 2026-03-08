@@ -192,7 +192,7 @@ void recv_and_save_file(size_t host_file_size, int new_sockfd, FILE *fp, char *l
 
     EVP_DigestFinal_ex(ctx, local_hash, &hash_len);
     EVP_MD_CTX_free(ctx);
-    print_sha256(local_hash);
+    
     printf("\n");
     return;
 }
