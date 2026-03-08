@@ -27,7 +27,7 @@ Receive files:
 
 Send a file:
 
-./lanshare send <filepath>
+./lanshare send (filepath)
 
 Example:
 
