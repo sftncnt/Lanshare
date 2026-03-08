@@ -35,7 +35,26 @@ Example:
 
 ## How it works
 
-Initiate a listener to receive the file using ./lanshare receive. The listener will create a UDP socket on port 3490 to listen for incoming connections. Running ./lanshare send <filepath> on a separate device or process will initiate a UDP socket that will send a broadcast message to its subnet with it's hostname and filename. A listener will automatically receive this broadcast and know how to unpack the message and display it to the user. After accepting the connection, a TCP socket will be created on the receiver end which the sender will connect to for the actual file transfer. During the TCP transmission, an initial header packet is sent with metadata such as filename and filesize for the receiver to be able to save the file with the same name and continue recv'ng in chunks until amount transferred is equal to the filesize. During transfer, a hash for the file is calculated on both ends. Once the sender finished sending all the chunks, the calculated hash on their end is send to the receiver. The receiver compares this hash with the one it calculated during transfer and deletes the file if integrity check fails. Once the file has been saved and check succeeds, the TCP connection is terminated and the proccess exits on both ends. 
+Lanshare has two modes: 
+### Send mode:
+- Sender sends a UDP broadcast to the subnet with its' hostname and name of the file to share.
+- Once it receives an acknowledgement for the broadcast, it connects to the peer that sent the acknowledgement via TCP.
+- Once connection is established, a header packet is sent containing file name, file size, and length of file name. This is used to allocate buffers for saving the file
+- The file is then sent in chunks to the client, with the hash of the file being computed as it is sent.
+- After full file is sent, the calculated hash is also sent and connection is terminated.
+
+### Receive mode:
+- Receiver initiates a UDP socket to listen for incoming broadcasts on.
+- Once a broadcast is received, the message is unpacked to display the file name and host name of the sender along with a prompt to accept the connection.
+- If accepted, an acknowledgement is sent back to the receiver and a TCP socket is initialized on port 3490 which the sender will connect to
+- After a connection is established, metadata about the sending file is received and unpacked.
+- File is received in chunks with a hash of the file being computed as the chunks come in.
+- Once full file is received, a separate hash of the file computed on the sender's end is received
+- This hash is compared with the computed hash to check for any corruption. If hashes don't match, file is removed.
+- After hash comparison, connection is terminated and process is exited.
+
+## Additional Notes
+Make sure both devices are connected to the same private wifi network. This won't work if even one peer's network connection is set to public. Aditionally, if your router is configured to have AP isolation or Client isolation then this project will not work as this setting is a safegaurd against device-to-device traffic. This was enabled on my 5ghz band but connecting to my regular 2.4ghz band network worked.
 
 ## For Windows
 
@@ -44,4 +63,5 @@ This project is entirely implemented in POSIX sockets. I plan to add Wndows comp
 ## Future improvements
 
 - Add windows support
-- Automatic Peer discovery + listing of peers available in the network
+- Improved peer discovery + listing of peers available in the network
+- Connection interruption handling + Resuming download
