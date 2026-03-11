@@ -65,3 +65,4 @@ This project is entirely implemented in POSIX sockets. I plan to add Wndows comp
 - Add windows support
 - Improved peer discovery + listing of peers available in the network
 - Connection interruption handling + Resuming download
+- Improve security
